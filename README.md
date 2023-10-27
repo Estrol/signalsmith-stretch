@@ -4,9 +4,20 @@ This is a C++11 library for pitch and time stretching, using the final approach 
 
 It can handle a wide-range of pitch-shifts (multiple octaves) but time-stretching sounds best for more modest changes (between 0.75x and 1.5x).  There are some audio examples and an interactive web demo on the [main project page](https://signalsmith-audio.co.uk/code/stretch/).
 
+----------
+
+This fork made to support Visual C++ compiler and refactor the code to into standard C++ header only module. It is not tested on other compilers.
+
+Also made into proper single library while removing `Sample` template to use `float` datatype only with meant to able use it on miniaudio.
+
+This also make suppression some MSVC warning on DSP library.
+
+----------
+
 ## How to use it
 
 ```cpp
+#define SIGNALSMITH_STRETCH_IMPLEMENTATION
 #include "signalsmith-stretch.h"
 
 signalsmith::stretch::SignalsmithStretch<float> stretch;
@@ -73,7 +84,18 @@ stretch.setFreqMap([](float inputFreq) {
 
 ### Time-stretching
 
-To get a time-stretch, hand differently-sized input/output buffers to .process(). There's no maximum block size for either input or output.
+To get a time-stretch, hand differently-sized input/output buffers to .process(). There's no maximum block size for either input or output, for example:
+
+```cpp
+float **inputBuffers, **outputBuffers;
+int inputSamples, outputSamples;
+
+float rate = 1.2;
+
+stretch.process(inputBuffers, inputSamples, outputBuffers, outputSamples * rate);
+```
+
+Note: output less than input size mean speed up the audio, and vice versa.
 
 Since the buffer lengths (inputSamples and outputSamples above) are integers, it's up to you to make sure that the block lengths average out to the ratio you want over time.
 
@@ -102,9 +124,7 @@ What you do with this extra start/end output is up to you. Personally, I'd try
 
 ## Compiling
 
-⚠️ This has mostly been tested with Clang. If you're using another compiler and have any problems, please get in touch.
-
-Just include `signalsmith-stretch.h` where needed.
+⚠️ This fork is tested in MSVC only at the moment (Clang might can still compile)
 
 It's much slower (about 10x) if optimisation is disabled though, so you might want to enable optimisation where it's used, even in debug builds.
 
