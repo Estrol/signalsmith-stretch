@@ -128,6 +128,8 @@ What you do with this extra start/end output is up to you. Personally, I'd try
 
 It's much slower (about 10x) if optimisation is disabled though, so you might want to enable optimisation where it's used, even in debug builds.
 
+In MSVC, to get best performance you have to enable /Od level 1 or more.
+
 ### DSP Library
 
 This uses the Signalsmith DSP library for FFTs and other bits and bobs.

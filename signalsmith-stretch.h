@@ -1,9 +1,9 @@
 #ifndef SIGNALSMITH_STRETCH_H
 #define SIGNALSMITH_STRETCH_H
-
 #include "dsp/delay.h"
 #include "dsp/perf.h"
 #include "dsp/spectral.h"
+
 SIGNALSMITH_DSP_VERSION_CHECK(1, 3, 3); // Check version is compatible
 #include <algorithm>
 #include <functional>
@@ -28,7 +28,7 @@ namespace signalsmith {
             std::complex<float> input;
             std::complex<float> shortVerticalTwist, longVerticalTwist;
 
-            std::complex<float> makeOutput(std::complex<float> phase)
+            std::complex<float> makeOutput(std::complex<float> &phase)
             {
                 float phaseNorm = std::norm(phase);
                 if (phaseNorm <= noiseFloor) {
@@ -67,7 +67,11 @@ namespace signalsmith {
             void setTransposeFactor(float multiplier, float tonalityLimit = 0);
             void setTransposeSemitones(float semitones, float tonalityLimit = 0);
             void setFreqMap(std::function<float(float)> inputToOutput);
-            void process(float **inputs, int inputSamples, float **outputs, int outputSamples);
+            void process(
+                std::vector<std::vector<float>> &inputs,
+                int                              inputSamples,
+                std::vector<std::vector<float>> &outputs,
+                int                              outputSamples);
 
         private:
             int  silenceCounter = 0;
@@ -84,12 +88,12 @@ namespace signalsmith {
             std::vector<float>                     timeBuffer;
 
             std::vector<std::complex<float>> rotCentreSpectrum, rotPrevInterval;
-            float                            bandToFreq(float b) const;
-            float                            freqToBand(float f) const;
-            void                             timeShiftPhases(float shiftSamples, std::vector<std::complex<float>> &output) const;
+            SIGNALSMITH_INLINE float         bandToFreq(float b) const;
+            SIGNALSMITH_INLINE float         freqToBand(float f) const;
+            SIGNALSMITH_INLINE void          timeShiftPhases(float shiftSamples, std::vector<std::complex<float>> &output) const;
 
-            std::vector<Band> channelBands;
-            Band             *bandsForChannel(int channel);
+            std::vector<Band>        channelBands;
+            SIGNALSMITH_INLINE Band *bandsForChannel(int channel);
 
             std::vector<Peak>          peaks;
             std::vector<float>         energy, smoothedEnergy;
@@ -99,11 +103,11 @@ namespace signalsmith {
 
             std::default_random_engine randomEngine;
 
-            void  processSpectrum(bool newSpectrum, float timeFactor);
-            void  smoothEnergy(float smoothingBins);
-            float mapFreq(float freq) const;
-            void  findPeaks(float smoothingBins);
-            void  updateOutputMap();
+            SIGNALSMITH_INLINE void  processSpectrum(bool newSpectrum, float timeFactor);
+            SIGNALSMITH_INLINE void  smoothEnergy(float smoothingBins);
+            SIGNALSMITH_INLINE float mapFreq(float freq) const;
+            SIGNALSMITH_INLINE void  findPeaks(float smoothingBins);
+            SIGNALSMITH_INLINE void  updateOutputMap();
         };
 
     } // namespace stretch
@@ -210,14 +214,18 @@ namespace signalsmith {
             return channelPredictions.data() + c * bands;
         }
 
-        void SignalsmithStretch::process(float **inputs, int inputSamples, float **outputs, int outputSamples)
+        void SignalsmithStretch::process(
+            std::vector<std::vector<float>> &inputs,
+            int                              inputSamples,
+            std::vector<std::vector<float>> &outputs,
+            int                              outputSamples)
         {
             float totalEnergy = 0;
             for (int c = 0; c < channels; ++c) {
-                auto &&inputChannel = inputs[c];
+                auto &inputChannel = inputs[c];
                 for (int i = 0; i < inputSamples; ++i) {
                     float s = inputChannel[i];
-                    totalEnergy += s * s;
+                    totalEnergy += std::pow(s, 2);
                 }
             }
             if (totalEnergy < noiseFloor) {
@@ -356,15 +364,17 @@ namespace signalsmith {
         }
 
         // PRIVATE IMPLEMENTATION
-        float SignalsmithStretch::bandToFreq(float b) const
+        SIGNALSMITH_INLINE float SignalsmithStretch::bandToFreq(float b) const
         {
             return (b + float(0.5)) / stft.fftSize();
         }
-        float SignalsmithStretch::freqToBand(float f) const
+
+        SIGNALSMITH_INLINE float SignalsmithStretch::freqToBand(float f) const
         {
             return f * stft.fftSize() - float(0.5);
         }
-        void SignalsmithStretch::timeShiftPhases(float shiftSamples, std::vector<std::complex<float>> &output) const
+
+        SIGNALSMITH_INLINE void SignalsmithStretch::timeShiftPhases(float shiftSamples, std::vector<std::complex<float>> &output) const
         {
             for (int b = 0; b < bands; ++b) {
                 float phase = bandToFreq((float)b) * shiftSamples * float(-2 * M_PI);
@@ -372,57 +382,57 @@ namespace signalsmith {
             }
         }
 
-        Band *SignalsmithStretch::bandsForChannel(int channel)
+        SIGNALSMITH_INLINE Band *SignalsmithStretch::bandsForChannel(int channel)
         {
             return channelBands.data() + channel * bands;
         }
 
         template <std::complex<float> Band::*member>
-        std::complex<float> getBand(std::vector<Band> &channelBands, int bands, int channel, int index)
+        SIGNALSMITH_INLINE std::complex<float> getBand(std::vector<Band> &channelBands, int bands, int channel, int index)
         {
             if (index < 0 || index >= bands)
                 return 0;
             return channelBands[index + channel * bands].*member;
         }
         template <std::complex<float> Band::*member>
-        std::complex<float> getFractional(std::vector<Band> &channelBands, int bands, int channel, int lowIndex, float fractional)
+        SIGNALSMITH_INLINE std::complex<float> getFractional(std::vector<Band> &channelBands, int bands, int channel, int lowIndex, float fractional)
         {
             std::complex<float> low = getBand<member>(channelBands, bands, channel, lowIndex);
             std::complex<float> high = getBand<member>(channelBands, bands, channel, lowIndex + 1);
             return low + (high - low) * fractional;
         }
         template <std::complex<float> Band::*member>
-        std::complex<float> getFractional(std::vector<Band> &channelBands, int bands, int channel, float inputIndex)
+        SIGNALSMITH_INLINE std::complex<float> getFractional(std::vector<Band> &channelBands, int bands, int channel, float inputIndex)
         {
             int   lowIndex = static_cast<int>(std::floor(inputIndex));
             float fracIndex = inputIndex - lowIndex;
             return getFractional<member>(channelBands, bands, channel, lowIndex, fracIndex);
         }
         template <float Band::*member>
-        float getBand(std::vector<Band> &channelBands, int bands, int channel, int index)
+        SIGNALSMITH_INLINE float getBand(std::vector<Band> &channelBands, int bands, int channel, int index)
         {
             if (index < 0 || index >= bands)
                 return 0;
             return channelBands[index + channel * bands].*member;
         }
         template <float Band::*member>
-        float getFractional(std::vector<Band> &channelBands, int bands, int channel, int lowIndex, float fractional)
+        SIGNALSMITH_INLINE float getFractional(std::vector<Band> &channelBands, int bands, int channel, int lowIndex, float fractional)
         {
             float low = getBand<member>(channelBands, bands, channel, lowIndex);
             float high = getBand<member>(channelBands, bands, channel, lowIndex + 1);
             return low + (high - low) * fractional;
         }
         template <float Band::*member>
-        float getFractional(std::vector<Band> &channelBands, int bands, int channel, float inputIndex)
+        SIGNALSMITH_INLINE float getFractional(std::vector<Band> &channelBands, int bands, int channel, float inputIndex)
         {
             int   lowIndex = std::floor(inputIndex);
             float fracIndex = inputIndex - lowIndex;
             return getFractional<member>(channelBands, bands, channel, lowIndex, fracIndex);
         }
 
-        void SignalsmithStretch::processSpectrum(bool newSpectrum, float timeFactor)
+        SIGNALSMITH_INLINE void SignalsmithStretch::processSpectrum(bool newSpectrum, float timeFactor)
         {
-            timeFactor = std::max<float>(timeFactor, 1 / maxCleanStretch);
+            timeFactor = (std::max)(timeFactor, 1.0f / maxCleanStretch);
             bool                                  randomTimeFactor = (timeFactor > maxCleanStretch);
             std::uniform_real_distribution<float> timeFactorDist(maxCleanStretch * 2 * randomTimeFactor - timeFactor, timeFactor);
 
@@ -560,7 +570,7 @@ namespace signalsmith {
             }
         }
 
-        void SignalsmithStretch::smoothEnergy(float smoothingBins)
+        SIGNALSMITH_INLINE void SignalsmithStretch::smoothEnergy(float smoothingBins)
         {
             float smoothingSlew = 1 / (1 + smoothingBins * float(0.5));
             for (auto &e : energy)
@@ -589,7 +599,7 @@ namespace signalsmith {
             }
         }
 
-        float SignalsmithStretch::mapFreq(float freq) const
+        SIGNALSMITH_INLINE float SignalsmithStretch::mapFreq(float freq) const
         {
             if (customFreqMap)
                 return customFreqMap(freq);
@@ -601,7 +611,7 @@ namespace signalsmith {
         }
 
         // Identifies spectral peaks using energy across all channels
-        void SignalsmithStretch::findPeaks(float smoothingBins)
+        SIGNALSMITH_INLINE void SignalsmithStretch::findPeaks(float smoothingBins)
         {
             smoothEnergy(smoothingBins);
 
@@ -627,7 +637,7 @@ namespace signalsmith {
             }
         }
 
-        void SignalsmithStretch::updateOutputMap()
+        SIGNALSMITH_INLINE void SignalsmithStretch::updateOutputMap()
         {
             if (peaks.empty()) {
                 for (int b = 0; b < bands; ++b) {
