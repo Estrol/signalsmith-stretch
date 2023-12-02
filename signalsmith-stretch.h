@@ -68,9 +68,9 @@ namespace signalsmith {
             void setTransposeSemitones(float semitones, float tonalityLimit = 0);
             void setFreqMap(std::function<float(float)> inputToOutput);
             void process(
-                std::vector<std::vector<float>> &inputs,
+                std::vector<float> &inputs,
                 int                              inputSamples,
-                std::vector<std::vector<float>> &outputs,
+                std::vector<float> &outputs,
                 int                              outputSamples);
 
         private:
@@ -215,16 +215,15 @@ namespace signalsmith {
         }
 
         void SignalsmithStretch::process(
-            std::vector<std::vector<float>> &inputs,
+            std::vector<float> &inputs,
             int                              inputSamples,
-            std::vector<std::vector<float>> &outputs,
+            std::vector<float> &outputs,
             int                              outputSamples)
         {
             float totalEnergy = 0;
             for (int c = 0; c < channels; ++c) {
-                auto &inputChannel = inputs[c];
                 for (int i = 0; i < inputSamples; ++i) {
-                    float s = inputChannel[i];
+                    float s = (&inputs[0] + c)[i * channels];
                     totalEnergy += std::pow(s, 2);
                 }
             }
@@ -243,14 +242,15 @@ namespace signalsmith {
                         for (int outputIndex = 0; outputIndex < outputSamples; ++outputIndex) {
                             int inputIndex = outputIndex % inputSamples;
                             for (int c = 0; c < channels; ++c) {
-                                outputs[c][outputIndex] = inputs[c][inputIndex];
+                                (&outputs[0] + c)[outputIndex * channels] = (&inputs[0] + c)[inputIndex * channels];
                             }
                         }
                     } else {
                         for (int c = 0; c < channels; ++c) {
                             auto &&outputChannel = outputs[c];
                             for (int outputIndex = 0; outputIndex < outputSamples; ++outputIndex) {
-                                outputChannel[outputIndex] = 0;
+                                //outputChannel[outputIndex * channels] = 0;
+                                (&outputs[0] + c)[outputIndex * channels] = 0;
                             }
                         }
                     }
@@ -261,7 +261,7 @@ namespace signalsmith {
                         auto &&bufferChannel = inputBuffer[c];
                         int    startIndex = std::max<int>(0, inputSamples - stft.windowSize());
                         for (int i = startIndex; i < inputSamples; ++i) {
-                            bufferChannel[i] = inputChannel[i];
+                            bufferChannel[i] = (&inputs[0] + c)[i * channels];
                         }
                     }
                     inputBuffer += inputSamples;
@@ -292,7 +292,7 @@ namespace signalsmith {
                             // Copy the rest from the input
                             auto &&inputChannel = inputs[c];
                             for (int i = std::max<int>(0, -inputOffset); i < stft.windowSize(); ++i) {
-                                timeBuffer[i] = inputChannel[i + inputOffset];
+                                timeBuffer[i] = (&inputs[0] + c)[(i + inputOffset) * channels];  //inputChannel[i + inputOffset];
                             }
                             stft.analyse(c, timeBuffer);
                         }
@@ -316,7 +316,7 @@ namespace signalsmith {
                                 // Copy the rest from the input
                                 auto &&inputChannel = inputs[c];
                                 for (int i = (std::max)(0, -prevIntervalOffset); i < stft.windowSize(); ++i) {
-                                    timeBuffer[i] = inputChannel[i + prevIntervalOffset];
+                                    timeBuffer[i] = (&inputs[0] + c)[(i + prevIntervalOffset) * channels]; //inputChannel[i + prevIntervalOffset];
                                 }
                                 stft.analyse(c, timeBuffer);
                             }
@@ -345,7 +345,8 @@ namespace signalsmith {
                 for (int c = 0; c < channels; ++c) {
                     auto &&outputChannel = outputs[c];
                     auto &&stftChannel = stft[c];
-                    outputChannel[outputIndex] = stftChannel[outputIndex];
+                    //outputChannel[outputIndex] = stftChannel[outputIndex];
+                    (&outputs[0] + c)[outputIndex * channels] = stftChannel[outputIndex];
                 }
             }
 
@@ -355,7 +356,7 @@ namespace signalsmith {
                 auto &&bufferChannel = inputBuffer[c];
                 int    startIndex = std::max<int>(0, inputSamples - stft.windowSize());
                 for (int i = startIndex; i < inputSamples; ++i) {
-                    bufferChannel[i] = inputChannel[i];
+                    bufferChannel[i] = (&inputs[0] + c)[i * channels];; //inputChannel[i];
                 }
             }
             inputBuffer += inputSamples;
@@ -480,7 +481,7 @@ namespace signalsmith {
                     prediction.input = getFractional<&Band::input>(channelBands, bands, c, lowIndex, fracIndex);
 
                     auto               &outputBin = bins[b];
-                    std::complex<float> prevInput = getFractional<&Band::prevInput>(channelBands, c, lowIndex, fracIndex);
+                    std::complex<float> prevInput = getFractional<&Band::prevInput>(channelBands, bands, c, lowIndex, fracIndex);
                     std::complex<float> freqTwist = signalsmith::perf::mul<true>(prediction.input, prevInput);
                     std::complex<float> phase = signalsmith::perf::mul(outputBin.prevOutput, freqTwist);
                     outputBin.output = phase / ((std::max)(prevEnergy, prediction.energy) + noiseFloor);
