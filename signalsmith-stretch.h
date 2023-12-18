@@ -224,7 +224,7 @@ namespace signalsmith {
             for (int c = 0; c < channels; ++c) {
                 for (int i = 0; i < inputSamples; ++i) {
                     float s = (&inputs[0] + c)[i * channels];
-                    totalEnergy += std::pow(s, 2);
+                    totalEnergy += std::pow(s, 2.0f);
                 }
             }
             if (totalEnergy < noiseFloor) {
@@ -247,7 +247,7 @@ namespace signalsmith {
                         }
                     } else {
                         for (int c = 0; c < channels; ++c) {
-                            auto &&outputChannel = outputs[c];
+                            //auto &&outputChannel = outputs[c];
                             for (int outputIndex = 0; outputIndex < outputSamples; ++outputIndex) {
                                 //outputChannel[outputIndex * channels] = 0;
                                 (&outputs[0] + c)[outputIndex * channels] = 0;
@@ -257,7 +257,7 @@ namespace signalsmith {
 
                     // Store input in history buffer
                     for (int c = 0; c < channels; ++c) {
-                        auto &&inputChannel = inputs[c];
+                        //auto &&inputChannel = inputs[c];
                         auto &&bufferChannel = inputBuffer[c];
                         int    startIndex = std::max<int>(0, inputSamples - stft.windowSize());
                         for (int i = startIndex; i < inputSamples; ++i) {
@@ -290,7 +290,7 @@ namespace signalsmith {
                                 timeBuffer[i] = bufferChannel[i + inputOffset];
                             }
                             // Copy the rest from the input
-                            auto &&inputChannel = inputs[c];
+                            //auto &&inputChannel = inputs[c];
                             for (int i = std::max<int>(0, -inputOffset); i < stft.windowSize(); ++i) {
                                 timeBuffer[i] = (&inputs[0] + c)[(i + inputOffset) * channels];  //inputChannel[i + inputOffset];
                             }
@@ -314,7 +314,7 @@ namespace signalsmith {
                                     timeBuffer[i] = bufferChannel[i + prevIntervalOffset];
                                 }
                                 // Copy the rest from the input
-                                auto &&inputChannel = inputs[c];
+                                //auto &&inputChannel = inputs[c];
                                 for (int i = (std::max)(0, -prevIntervalOffset); i < stft.windowSize(); ++i) {
                                     timeBuffer[i] = (&inputs[0] + c)[(i + prevIntervalOffset) * channels]; //inputChannel[i + prevIntervalOffset];
                                 }
@@ -343,7 +343,7 @@ namespace signalsmith {
                 });
 
                 for (int c = 0; c < channels; ++c) {
-                    auto &&outputChannel = outputs[c];
+                    //auto &&outputChannel = outputs[c];
                     auto &&stftChannel = stft[c];
                     //outputChannel[outputIndex] = stftChannel[outputIndex];
                     (&outputs[0] + c)[outputIndex * channels] = stftChannel[outputIndex];
@@ -352,7 +352,7 @@ namespace signalsmith {
 
             // Store input in history buffer
             for (int c = 0; c < channels; ++c) {
-                auto &&inputChannel = inputs[c];
+                //auto &&inputChannel = inputs[c];
                 auto &&bufferChannel = inputBuffer[c];
                 int    startIndex = std::max<int>(0, inputSamples - stft.windowSize());
                 for (int i = startIndex; i < inputSamples; ++i) {
