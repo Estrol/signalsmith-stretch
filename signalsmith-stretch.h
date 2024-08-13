@@ -69,9 +69,14 @@ namespace signalsmith {
             void setFreqMap(std::function<float(float)> inputToOutput);
             void process(
                 std::vector<float> &inputs,
-                int                              inputSamples,
+                int                 inputSamples,
                 std::vector<float> &outputs,
-                int                              outputSamples);
+                int                 outputSamples);
+            void process(
+                float *inputs,
+                int    inputSamples,
+                float *outputs,
+                int    outputSamples);
 
         private:
             int  silenceCounter = 0;
@@ -216,9 +221,9 @@ namespace signalsmith {
 
         void SignalsmithStretch::process(
             std::vector<float> &inputs,
-            int                              inputSamples,
+            int                 inputSamples,
             std::vector<float> &outputs,
-            int                              outputSamples)
+            int                 outputSamples)
         {
             float totalEnergy = 0;
             for (int c = 0; c < channels; ++c) {
@@ -247,9 +252,9 @@ namespace signalsmith {
                         }
                     } else {
                         for (int c = 0; c < channels; ++c) {
-                            //auto &&outputChannel = outputs[c];
+                            // auto &&outputChannel = outputs[c];
                             for (int outputIndex = 0; outputIndex < outputSamples; ++outputIndex) {
-                                //outputChannel[outputIndex * channels] = 0;
+                                // outputChannel[outputIndex * channels] = 0;
                                 (&outputs[0] + c)[outputIndex * channels] = 0;
                             }
                         }
@@ -257,7 +262,7 @@ namespace signalsmith {
 
                     // Store input in history buffer
                     for (int c = 0; c < channels; ++c) {
-                        //auto &&inputChannel = inputs[c];
+                        // auto &&inputChannel = inputs[c];
                         auto &&bufferChannel = inputBuffer[c];
                         int    startIndex = std::max<int>(0, inputSamples - stft.windowSize());
                         for (int i = startIndex; i < inputSamples; ++i) {
@@ -290,9 +295,9 @@ namespace signalsmith {
                                 timeBuffer[i] = bufferChannel[i + inputOffset];
                             }
                             // Copy the rest from the input
-                            //auto &&inputChannel = inputs[c];
+                            // auto &&inputChannel = inputs[c];
                             for (int i = std::max<int>(0, -inputOffset); i < stft.windowSize(); ++i) {
-                                timeBuffer[i] = (&inputs[0] + c)[(i + inputOffset) * channels];  //inputChannel[i + inputOffset];
+                                timeBuffer[i] = (&inputs[0] + c)[(i + inputOffset) * channels]; // inputChannel[i + inputOffset];
                             }
                             stft.analyse(c, timeBuffer);
                         }
@@ -314,9 +319,9 @@ namespace signalsmith {
                                     timeBuffer[i] = bufferChannel[i + prevIntervalOffset];
                                 }
                                 // Copy the rest from the input
-                                //auto &&inputChannel = inputs[c];
+                                // auto &&inputChannel = inputs[c];
                                 for (int i = (std::max)(0, -prevIntervalOffset); i < stft.windowSize(); ++i) {
-                                    timeBuffer[i] = (&inputs[0] + c)[(i + prevIntervalOffset) * channels]; //inputChannel[i + prevIntervalOffset];
+                                    timeBuffer[i] = (&inputs[0] + c)[(i + prevIntervalOffset) * channels]; // inputChannel[i + prevIntervalOffset];
                                 }
                                 stft.analyse(c, timeBuffer);
                             }
@@ -343,20 +348,172 @@ namespace signalsmith {
                 });
 
                 for (int c = 0; c < channels; ++c) {
-                    //auto &&outputChannel = outputs[c];
+                    // auto &&outputChannel = outputs[c];
                     auto &&stftChannel = stft[c];
-                    //outputChannel[outputIndex] = stftChannel[outputIndex];
+                    // outputChannel[outputIndex] = stftChannel[outputIndex];
                     (&outputs[0] + c)[outputIndex * channels] = stftChannel[outputIndex];
                 }
             }
 
             // Store input in history buffer
             for (int c = 0; c < channels; ++c) {
-                //auto &&inputChannel = inputs[c];
+                // auto &&inputChannel = inputs[c];
                 auto &&bufferChannel = inputBuffer[c];
                 int    startIndex = std::max<int>(0, inputSamples - stft.windowSize());
                 for (int i = startIndex; i < inputSamples; ++i) {
-                    bufferChannel[i] = (&inputs[0] + c)[i * channels];; //inputChannel[i];
+                    bufferChannel[i] = (&inputs[0] + c)[i * channels];
+                    ; // inputChannel[i];
+                }
+            }
+            inputBuffer += inputSamples;
+            stft += outputSamples;
+            prevInputOffset -= inputSamples;
+        }
+
+        void SignalsmithStretch::process(
+            float *inputs,
+            int    inputSamples,
+            float *outputs,
+            int    outputSamples)
+        {
+            float totalEnergy = 0;
+            for (int c = 0; c < channels; ++c) {
+                for (int i = 0; i < inputSamples; ++i) {
+                    float s = (&inputs[0] + c)[i * channels];
+                    totalEnergy += std::pow(s, 2.0f);
+                }
+            }
+            if (totalEnergy < noiseFloor) {
+                if (silenceCounter >= 2 * stft.windowSize()) {
+                    if (silenceFirst) {
+                        silenceFirst = false;
+                        for (auto &b : channelBands) {
+                            b.input = b.prevInput = b.output = b.prevOutput = 0;
+                            b.inputEnergy = 0;
+                        }
+                    }
+
+                    if (inputSamples > 0) {
+                        // copy from the input, wrapping around if needed
+                        for (int outputIndex = 0; outputIndex < outputSamples; ++outputIndex) {
+                            int inputIndex = outputIndex % inputSamples;
+                            for (int c = 0; c < channels; ++c) {
+                                (&outputs[0] + c)[outputIndex * channels] = (&inputs[0] + c)[inputIndex * channels];
+                            }
+                        }
+                    } else {
+                        for (int c = 0; c < channels; ++c) {
+                            // auto &&outputChannel = outputs[c];
+                            for (int outputIndex = 0; outputIndex < outputSamples; ++outputIndex) {
+                                // outputChannel[outputIndex * channels] = 0;
+                                (&outputs[0] + c)[outputIndex * channels] = 0;
+                            }
+                        }
+                    }
+
+                    // Store input in history buffer
+                    for (int c = 0; c < channels; ++c) {
+                        // auto &&inputChannel = inputs[c];
+                        auto &&bufferChannel = inputBuffer[c];
+                        int    startIndex = std::max<int>(0, inputSamples - stft.windowSize());
+                        for (int i = startIndex; i < inputSamples; ++i) {
+                            bufferChannel[i] = (&inputs[0] + c)[i * channels];
+                        }
+                    }
+                    inputBuffer += inputSamples;
+                    return;
+                } else {
+                    silenceCounter += inputSamples;
+                }
+            } else {
+                silenceCounter = 0;
+                silenceFirst = true;
+            }
+
+            for (int outputIndex = 0; outputIndex < outputSamples; ++outputIndex) {
+                stft.ensureValid(outputIndex, [&](int outputOffset) {
+                    // Time to process a spectrum!  Where should it come from in the input?
+                    int inputOffset = static_cast<int>(std::round(outputOffset * float(inputSamples) / outputSamples) - stft.windowSize());
+                    int inputInterval = inputOffset - prevInputOffset;
+                    prevInputOffset = inputOffset;
+
+                    bool newSpectrum = (inputInterval > 0);
+                    if (newSpectrum) {
+                        for (int c = 0; c < channels; ++c) {
+                            // Copy from the history buffer, if needed
+                            auto &&bufferChannel = inputBuffer[c];
+                            for (int i = 0; i < -inputOffset; ++i) {
+                                timeBuffer[i] = bufferChannel[i + inputOffset];
+                            }
+                            // Copy the rest from the input
+                            // auto &&inputChannel = inputs[c];
+                            for (int i = std::max<int>(0, -inputOffset); i < stft.windowSize(); ++i) {
+                                timeBuffer[i] = (&inputs[0] + c)[(i + inputOffset) * channels]; // inputChannel[i + inputOffset];
+                            }
+                            stft.analyse(c, timeBuffer);
+                        }
+
+                        for (int c = 0; c < channels; ++c) {
+                            auto   channelBands = bandsForChannel(c);
+                            auto &&spectrumBands = stft.spectrum[c];
+                            for (int b = 0; b < bands; ++b) {
+                                channelBands[b].input = signalsmith::perf::mul(spectrumBands[b], rotCentreSpectrum[b]);
+                            }
+                        }
+
+                        if (inputInterval != stft.interval()) { // make sure the previous input is the correct distance in the past
+                            int prevIntervalOffset = inputOffset - stft.interval();
+                            for (int c = 0; c < channels; ++c) {
+                                // Copy from the history buffer, if needed
+                                auto &&bufferChannel = inputBuffer[c];
+                                for (int i = 0; i < (std::min)(-prevIntervalOffset, stft.windowSize()); ++i) {
+                                    timeBuffer[i] = bufferChannel[i + prevIntervalOffset];
+                                }
+                                // Copy the rest from the input
+                                // auto &&inputChannel = inputs[c];
+                                for (int i = (std::max)(0, -prevIntervalOffset); i < stft.windowSize(); ++i) {
+                                    timeBuffer[i] = (&inputs[0] + c)[(i + prevIntervalOffset) * channels]; // inputChannel[i + prevIntervalOffset];
+                                }
+                                stft.analyse(c, timeBuffer);
+                            }
+                            for (int c = 0; c < channels; ++c) {
+                                auto   channelBands = bandsForChannel(c);
+                                auto &&spectrumBands = stft.spectrum[c];
+                                for (int b = 0; b < bands; ++b) {
+                                    channelBands[b].prevInput = signalsmith::perf::mul(spectrumBands[b], rotCentreSpectrum[b]);
+                                }
+                            }
+                        }
+                    }
+
+                    float timeFactor = stft.interval() / (std::max)(1.0f, (float)inputInterval);
+                    processSpectrum(newSpectrum, timeFactor);
+
+                    for (int c = 0; c < channels; ++c) {
+                        auto   channelBands = bandsForChannel(c);
+                        auto &&spectrumBands = stft.spectrum[c];
+                        for (int b = 0; b < bands; ++b) {
+                            spectrumBands[b] = signalsmith::perf::mul<true>(channelBands[b].output, rotCentreSpectrum[b]);
+                        }
+                    }
+                });
+
+                for (int c = 0; c < channels; ++c) {
+                    // auto &&outputChannel = outputs[c];
+                    auto &&stftChannel = stft[c];
+                    // outputChannel[outputIndex] = stftChannel[outputIndex];
+                    (&outputs[0] + c)[outputIndex * channels] = stftChannel[outputIndex];
+                }
+            }
+
+            // Store input in history buffer
+            for (int c = 0; c < channels; ++c) {
+                // auto &&inputChannel = inputs[c];
+                auto &&bufferChannel = inputBuffer[c];
+                int    startIndex = std::max<int>(0, inputSamples - stft.windowSize());
+                for (int i = startIndex; i < inputSamples; ++i) {
+                    bufferChannel[i] = (&inputs[0] + c)[i * channels];
+                    ; // inputChannel[i];
                 }
             }
             inputBuffer += inputSamples;
@@ -365,7 +522,8 @@ namespace signalsmith {
         }
 
         // PRIVATE IMPLEMENTATION
-        SIGNALSMITH_INLINE float SignalsmithStretch::bandToFreq(float b) const
+        SIGNALSMITH_INLINE float
+        SignalsmithStretch::bandToFreq(float b) const
         {
             return (b + float(0.5)) / stft.fftSize();
         }
