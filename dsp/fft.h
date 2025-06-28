@@ -130,7 +130,9 @@ namespace signalsmith { namespace fft {
 				for (size_t i = 0; i < subLength; ++i) {
 					for (size_t f = 0; f < factor; ++f) {
 						double phase = 2*M_PI*i*f/length;
-						complex twiddle = {V(std::cos(phase)), V(-std::sin(phase))};
+						V real = V(std::cos(phase));
+						V imag = V(-std::sin(phase));
+						complex twiddle = {real, imag};
 						twiddleVector.push_back(twiddle);
 					}
 				}
@@ -211,7 +213,9 @@ namespace signalsmith { namespace fft {
 						complex sum = working[0];
 						for (size_t i = 1; i < factor; ++i) {
 							double phase = 2*M_PI*f*i/factor;
-							complex twiddle = {V(std::cos(phase)), V(-std::sin(phase))};
+							V real = V(std::cos(phase));
+							V imag = V(-std::sin(phase));
+							complex twiddle = {real, imag};
 							sum += _fft_impl::complexMul<inverse>(working[i], twiddle);
 						}
 						data[f*stride] = sum;
@@ -243,7 +247,7 @@ namespace signalsmith { namespace fft {
 
 		template<bool inverse, typename RandomAccessIterator>
 		SIGNALSMITH_INLINE void fftStep3(RandomAccessIterator &&origData, const Step &step) {
-			constexpr complex factor3 = {-0.5, inverse ? 0.8660254037844386 : -0.8660254037844386};
+			constexpr complex factor3 = {V(-0.5), inverse ? V(0.8660254037844386) : V(-0.8660254037844386)};
 			const size_t stride = step.innerRepeats;
 			const complex *origTwiddles = twiddleVector.data() + step.twiddleIndex;
 			
@@ -429,13 +433,13 @@ namespace signalsmith { namespace fft {
 			size_t hhSize = size/4 + 1;
 			twiddlesMinusI.resize(hhSize);
 			for (size_t i = 0; i < hhSize; ++i) {
-				V rotPhase = -2*M_PI*(modified ? i + 0.5 : i)/size;
+				V rotPhase = V(-2*M_PI*(modified ? i + 0.5 : i)/size);
 				twiddlesMinusI[i] = {std::sin(rotPhase), -std::cos(rotPhase)};
 			}
 			if (modified) {
 				modifiedRotations.resize(size/2);
 				for (size_t i = 0; i < size/2; ++i) {
-					V rotPhase = -2*M_PI*i/size;
+					V rotPhase = V(-2*M_PI*i/size);
 					modifiedRotations[i] = {std::cos(rotPhase), std::sin(rotPhase)};
 				}
 			}

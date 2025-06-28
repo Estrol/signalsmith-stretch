@@ -37,11 +37,11 @@ namespace spectral {
 	public:
 		/// Returns a fast FFT size <= `size`
 		static int fastSizeAbove(int size, int divisor=1) {
-			return MRFFT::fastSizeAbove(size/divisor)*divisor;
+			return int(MRFFT::fastSizeAbove(size/divisor))*divisor;
 		}
 		/// Returns a fast FFT size >= `size`
 		static int fastSizeBelow(int size, int divisor=1) {
-			return MRFFT::fastSizeBelow(1 + (size - 1)/divisor)*divisor;
+			return int(MRFFT::fastSizeBelow(1 + (size - 1)/divisor))*divisor;
 		}
 
 		WindowedFFT() {}
@@ -86,7 +86,7 @@ namespace spectral {
 			return this->fftWindow;
 		}
 		int size() const {
-			return mrfft.size();
+			return int(mrfft.size());
 		}
 		
 		/// Performs an FFT (with windowing)
@@ -112,14 +112,14 @@ namespace spectral {
 		template<class Input, class Output>
 		void ifft(Input &&input, Output &&output) {
 			mrfft.ifft(input, timeBuffer);
-			int fftSize = mrfft.size();
+			size_t fftSize = mrfft.size();
 			Sample norm = 1/(Sample)fftSize;
 
-			for (int i = 0; i < offsetSamples; ++i) {
+			for (size_t i = 0; i < offsetSamples; ++i) {
 				// Inverted polarity since we're using the MRFFT
 				output[i] = -timeBuffer[i + fftSize - offsetSamples]*norm*fftWindow[i];
 			}
-			for (int i = offsetSamples; i < fftSize; ++i) {
+			for (size_t i = offsetSamples; i < fftSize; ++i) {
 				output[i] = timeBuffer[i - offsetSamples]*norm*fftWindow[i];
 			}
 		}

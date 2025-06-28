@@ -81,7 +81,7 @@ namespace signalsmith
             void seek(
                 float *inputs,
                 int inputSamples,
-                double playbackRate);
+                float playbackRate);
 
         private:
             int silenceCounter = 0;
@@ -452,7 +452,7 @@ namespace signalsmith
         void SignalsmithStretch::seek(
             float *inputs,
             int inputSamples,
-            double playbackRate)
+            float playbackRate)
         {
             inputBuffer.reset();
             float totalEnergy = 0;

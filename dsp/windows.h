@@ -189,9 +189,10 @@ namespace windows {
 			double invSize = 1.0/size;
 			double offsetScale = gaussian(1)/(gaussian(3) + gaussian(-1));
 			double norm = 1/(gaussian(0) - 2*offsetScale*(gaussian(2)));
+			using ValueType = std::remove_reference_t<decltype(data[0])>;
 			for (int i = 0; i < size; ++i) {
 				double r = (2*i + 1)*invSize - 1;
-				data[i] = norm*(gaussian(r) - offsetScale*(gaussian(r - 2) + gaussian(r + 2)));
+				data[i] = static_cast<ValueType>(norm*(gaussian(r) - offsetScale*(gaussian(r - 2) + gaussian(r + 2))));
 			}
 		}
 	};
@@ -202,16 +203,17 @@ namespace windows {
 	*/
 	template<typename Data>
 	void forcePerfectReconstruction(Data &&data, int windowLength, int interval) {
-		for (int i = 0; i < interval; ++i) {
-			double sum2 = 0;
-			for (int index = i; index < windowLength; index += interval) {
-				sum2 += data[index]*data[index];
-			}
-			double factor = 1/std::sqrt(sum2);
-			for (int index = i; index < windowLength; index += interval) {
-				data[index] *= factor;
-			}
-		}
+	   for (int i = 0; i < interval; ++i) {
+		   double sum2 = 0;
+		   for (int index = i; index < windowLength; index += interval) {
+			   sum2 += data[index]*data[index];
+		   }
+		   double factor = 1/std::sqrt(sum2);
+		   using ValueType = std::remove_reference_t<decltype(data[0])>;
+		   for (int index = i; index < windowLength; index += interval) {
+			   data[index] *= static_cast<ValueType>(factor);
+		   }
+	   }
 	}
 
 /** @} */
